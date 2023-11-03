@@ -1,0 +1,167 @@
+# ElectionGuard Verifier 1X Main Module
+
+#=
+Copyright (c) 2023 The MITRE Corporation
+
+This program is free software: you can redistribute it and/or
+modify it under the terms of the MIT License.
+=#
+
+"""
+    ElectionGuardVerifier1X
+
+This module incorporates all of the modules that make up this
+ElectionGuard verifier.  Its exported functions are expected to be
+made available by using the module in a Julia intepreter.
+"""
+module ElectionGuardVerifier1X
+
+export load, check, verify, validate
+
+import JSON
+
+include("Datatypes.jl")
+
+using .Datatypes: Election_record
+
+include("Record_version.jl")
+include("Loader.jl")
+
+using .Loader: load
+
+include("Utils.jl")
+
+include("Parallel_mapreduce.jl")
+
+include("Hash.jl")
+
+include("Answers.jl")
+
+using .Answers: Answer, Verification_record, verification_record
+
+# Parameter validation
+include("Standard_constants.jl")
+include("Params.jl")
+
+# Guardian Public-key Validation
+include("Guardian_pubkey.jl")
+
+# Election Public-Key Validation
+include("Election_pubkey.jl")
+
+# Extended Base Hash Validation
+include("Extended_base_hash.jl")
+
+# Correctness of Selection Encryptions
+include("Selection_encryptions.jl")
+
+# Adherence to vote limits (Not used in 1.91 validatino)
+#include("Vote_limits.jl")
+
+# Duplicate confirmation codes
+include("Duplicate_conf_codes.jl")
+
+# Correctness of Ballot Aggregation
+include("Ballot_aggregation.jl")
+
+#=
+Not used in 1.91 validation
+
+# Correctness of Partial Decryptions
+include("Partial_decryptions.jl")
+
+# Correctness of Substitute Decryptions
+include("Substitute_decryptions.jl")
+
+# Correctness of Coefficients
+include("Coefficients.jl")
+
+# Missing Tally Share
+include("Missing_tally_share.jl")
+=#
+
+# Validation of Correct Decryption of Tallies
+include("Tally_decryptions.jl")
+
+# Validation of Contest Selections with the Manifest
+include("Contest_selections.jl")
+
+# Validation of Correct Decryption of Spoiled Ballots
+include("Spoiled_ballots.jl")
+
+# Validation of Correctness of Spoiled Ballots
+include("Well_formed_spoiled_ballots.jl")
+
+function print_push!(as::Vector{Answer}, a::Answer)
+    println(a)
+    push!(as, a)
+end
+
+"""
+    verify(er::Election_record)::Verification_record
+
+Verify election records.  Return a verification record.
+"""
+function verify(er::Election_record)::Verification_record
+    println(er.manifest.election_scope_id)
+    # Each verification function returns an answer.
+    # This function pushes each answer on vector as and prints it.
+    as = Vector{Answer}()
+    print_push!(as, Params.verify_params(er))
+    print_push!(as, Guardian_pubkey.verify_guardian_pubkey(er))
+    print_push!(as, Election_pubkey.verify_election_pubkey(er))
+    print_push!(as, Extended_base_hash.verify_extended_base_hash(er))
+    print_push!(as, Selection_encryptions.verify_selection_encryptions(er))
+    # print_push!(as, Vote_limits.verify_vote_limits(er))
+    # println("6A. Correctness of confirmation codes was not checked.")
+    print_push!(as, Duplicate_conf_codes.verify_duplicate_conf_codes(er))
+    print_push!(as, Ballot_aggregation.verify_ballot_aggregation(er))
+    print_push!(as, Tally_decryptions.
+        verify_tally_decryptions(er, er.tally))
+    #=
+    print_push!(as, Partial_decryptions.
+        verify_partial_decryptions(er, er.tally, true))
+    print_push!(as, Substitute_decryptions.
+        verify_substitute_decryptions(er, er.tally, true))
+    print_push!(as, Coefficients.verify_coefficients(er))
+    print_push!(as, Missing_tally_share.
+        verify_missing_tally_share(er, er.tally, true))
+    =#
+    print_push!(as, Contest_selections.
+        verify_contest_selections(er, er.tally))
+    append!(as, Spoiled_ballots.verify_spoiled_ballots(er))
+    print_push!(as, Well_formed_spoiled_ballots.
+        verify_well_formed_spoiled_ballots(er))
+    verification_record(er, as)
+end
+
+"""
+    check(er::Election_record, path::String="")::Bool
+
+Check election record.  Write answers to path in JSON if path is not empty.
+"""
+function check(er::Election_record, path::String="")::Bool
+    vr = verify(er)
+    if path != ""
+        handle = open(path, "w")
+        try
+            JSON.print(handle, vr, 2)
+        finally
+            close(handle)
+        end
+    end
+    vr.verified
+end
+
+"""
+    validate(path::AbstractString, log::String="")::Bool
+
+Load and then check the election record in path.
+Write answers to log in JSON if path is not empty.
+"""
+function validate(path::AbstractString, log::String="")::Bool
+    er = load(path)
+    check(er, log)
+end
+
+end # ElectionGuard module
