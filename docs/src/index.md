@@ -13,7 +13,7 @@ ElectionGuard uses cryptography to ensure that
    tallied.
 
 Version 1.91 of the MITRE ElectionGuard Verifier provides the means
-to validate
+to validate this
 [specification](https://www.electionguard.vote/elections/College_Park_Maryland_2023/)
 in an easy to use package.
 
