@@ -78,9 +78,9 @@ function verify_params(er::Election_record)::Answer
     hash_p = eg_hash(q, ver, "00", er_const.p, q, er_const.g)
     manifest_hash = er_ctx.manifest_hash
     hash_m = eg_hash(q, hash_p, "01", manifest_hash)
-    hash_q = eg_hash(q, hash_p, "02", hash_m,
+    hash_q = eg_hash(q, hash_p, "02",
                      er_ctx.number_of_guardians,
-                     er_ctx.quorum)
+                     er_ctx.quorum, hash_m)
 
     # Check manifest hash (Item I)
     count += 1
